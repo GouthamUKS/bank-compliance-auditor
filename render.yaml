@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: bank-auditor
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: AUDIT_URL
+        value: https://example.com
+      - key: WCAG_LEVEL
+        value: AA
+      - key: WCAG_VERSION
+        value: 2.1
+      - key: MAX_CRITICAL_ISSUES
+        value: 0
+      - key: MAX_SERIOUS_ISSUES
+        value: 5
+      - key: MAX_MODERATE_ISSUES
+        value: 15
