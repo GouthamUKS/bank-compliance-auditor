@@ -1,0 +1,37 @@
+{
+  "name": "bank-compliance-auditor",
+  "version": "1.0.0",
+  "description": "Automated Compliance & Accessibility Auditor for Banking - WCAG 2.1 Compliance Scanner",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "audit": "node src/index.js",
+    "audit:local": "node src/index.js --url http://localhost:3000",
+    "test": "node --test tests/**/*.test.js",
+    "test:watch": "node --test --watch tests/**/*.test.js",
+    "report": "node src/generateReport.js",
+    "ci:audit": "node src/index.js && node src/checkCompliance.js",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "web": "npm start"
+  },
+  "keywords": [
+    "accessibility",
+    "wcag",
+    "compliance",
+    "banking",
+    "auditor",
+    "ci-cd"
+  ],
+  "author": "Bank Compliance Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^5.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "pa11y": "^9.0.1",
+    "winston": "^3.11.0"
+  }
+}

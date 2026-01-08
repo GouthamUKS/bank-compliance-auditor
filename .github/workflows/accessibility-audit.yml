@@ -1,0 +1,160 @@
+name: 🔐 Accessibility & Compliance Audit
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  accessibility-audit:
+    name: Run Accessibility Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 🔑 Load environment variables
+        run: |
+          # Create .env from GitHub secrets
+          cat > .env << EOF
+          AUDIT_URL=${{ secrets.AUDIT_URL }}
+          API_KEY=${{ secrets.API_KEY }}
+          API_SECRET=${{ secrets.API_SECRET }}
+          WCAG_LEVEL=AA
+          WCAG_VERSION=2.1
+          MAX_CRITICAL_ISSUES=0
+          MAX_SERIOUS_ISSUES=5
+          MAX_MODERATE_ISSUES=15
+          FAIL_ON_CRITICAL=true
+          FAIL_ON_SERIOUS=true
+          NODE_ENV=production
+          STRICT_MODE=true
+          NOTIFICATION_WEBHOOK=${{ secrets.SLACK_WEBHOOK }}
+          EOF
+          echo "✓ Environment variables loaded from secrets"
+
+      - name: 📥 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run accessibility audit
+        id: audit
+        run: |
+          npm run audit 2>&1 | tee audit-output.log
+        continue-on-error: true
+
+      - name: 📊 Check compliance thresholds
+        id: compliance
+        run: npm run ci:audit 2>&1 | tee compliance-output.log
+        continue-on-error: true
+
+      - name: 📤 Upload reports as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-reports
+          path: |
+            reports/
+            logs/
+          retention-days: 30
+
+      - name: 📈 Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Find and read the latest report
+            const reportsDir = './reports';
+            let reportContent = '## 🔐 Accessibility Audit Report\n\n';
+            
+            if (fs.existsSync(reportsDir)) {
+              const files = fs.readdirSync(reportsDir);
+              const jsonReport = files.find(f => f.endsWith('.json'));
+              
+              if (jsonReport) {
+                const report = JSON.parse(
+                  fs.readFileSync(path.join(reportsDir, jsonReport), 'utf-8')
+                );
+                
+                reportContent += `### 📊 Summary\n`;
+                reportContent += `- **Status**: ${report.auditResults.status}\n`;
+                reportContent += `- **Compliance Score**: ${report.auditResults.complianceScore}%\n`;
+                reportContent += `- **Total Issues**: ${report.summary.total_issues}\n\n`;
+                
+                reportContent += `### 📋 Issue Breakdown\n`;
+                reportContent += `- 🔴 Critical: ${report.summary.critical}\n`;
+                reportContent += `- 🟠 Serious: ${report.summary.serious}\n`;
+                reportContent += `- 🟡 Moderate: ${report.summary.moderate}\n`;
+                reportContent += `- 🟢 Minor: ${report.summary.minor}\n\n`;
+                
+                reportContent += `### 📝 Details\n`;
+                reportContent += `See the artifacts tab for detailed reports.\n`;
+              }
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: reportContent
+            });
+
+      - name: 🚨 Fail if compliance check failed
+        if: steps.compliance.outcome == 'failure'
+        run: |
+          echo "❌ Accessibility compliance check FAILED"
+          echo "Deployment is BLOCKED until compliance issues are resolved"
+          exit 1
+
+      - name: ✅ Success notification
+        if: success()
+        run: |
+          echo "✅ All accessibility checks passed!"
+          echo "✓ Deployment is approved"
+
+      - name: 📢 Send Slack notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🔐 Accessibility Audit Report",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Accessibility Audit Status*\n${{ steps.compliance.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Repository:* ${{ github.repository }}\n*Branch:* ${{ github.ref }}\n*Commit:* ${{ github.sha }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  auditor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bank-auditor
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - AUDIT_URL=${AUDIT_URL:-https://bankapp.example.com}
+      - WCAG_LEVEL=AA
+      - WCAG_VERSION=2.1
+      - MAX_CRITICAL_ISSUES=0
+      - MAX_SERIOUS_ISSUES=5
+      - MAX_MODERATE_ISSUES=15
+      - LOG_LEVEL=info
+      - PORT=3000
+    volumes:
+      - ./reports:/app/reports
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Add nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: bank-auditor-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auditor
+    restart: unless-stopped
+
+volumes:
+  reports:
+  logs:
