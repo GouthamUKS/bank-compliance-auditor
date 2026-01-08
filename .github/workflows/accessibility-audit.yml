@@ -65,6 +65,12 @@ jobs:
         run: npm run ci:audit 2>&1 | tee compliance-output.log
         continue-on-error: true
 
+      - name: 📤 Create artifacts directories
+        if: always()
+        run: |
+          mkdir -p reports logs
+          echo "✓ Artifacts directories created"
+
       - name: 📤 Upload reports as artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -74,6 +80,7 @@ jobs:
             reports/
             logs/
           retention-days: 30
+          if-no-files-found: warn
 
       - name: 📈 Comment PR with results
         if: github.event_name == 'pull_request' && always()
@@ -133,7 +140,7 @@ jobs:
           echo "✓ Deployment is approved"
 
       - name: 📢 Send Slack notification
-        if: always()
+        if: always() && secrets.SLACK_WEBHOOK != ''
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
@@ -158,3 +165,4 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true
