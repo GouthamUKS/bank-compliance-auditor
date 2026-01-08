@@ -20,8 +20,11 @@ export class AccessibilityAuditor {
     try {
       logger.info(`Starting accessibility audit for: ${url}`);
 
+      // Pa11y expects standard format: WCAG2A, WCAG2AA, or WCAG2AAA
+      const wcagStandard = `WCAG2${this.config.wcagLevel}`;
+      
       const auditResult = await pa11y(url, {
-        standard: this.config.wcagLevel,
+        standard: wcagStandard,
         include: ['.bank-container', 'main', '.content'],
         runners: ['axe'],
         wait: 5000,
